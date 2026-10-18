@@ -1,0 +1,18 @@
+---
+title: "P8105 Homework 3"
+author: "Astrid Xu"
+date: "2026-10-18"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(p8105.datasets)
+
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE
+)
+```
+
