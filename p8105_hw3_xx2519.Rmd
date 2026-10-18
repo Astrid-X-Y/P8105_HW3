@@ -121,3 +121,134 @@ print(snow_plot)
 temp_plot / snow_plot
 ```
 
+### Q2
+```{r}
+# Loading
+nhanes_covar = read_csv("nhanes_covar.csv")
+glimpse(nhanes_covar)
+# From glimpese the nhanes_covar dataset was not imported correctly bc the first four rows contain variable descriptions and were mistakenly interpreted as column names
+nhanes_covar = read_csv("nhanes_covar.csv", skip = 4)
+glimpse(nhanes_covar)
+
+nhanes_accel = read_csv("nhanes_accel.csv")
+glimpse(nhanes_accel)
+
+# Filtration
+nhanes_covar = nhanes_covar |>
+  filter(age >= 21)
+
+nhanes_covar = nhanes_covar |>
+  drop_na(sex, age, BMI, education)
+glimpse(nhanes_covar)
+
+# Mutation and Labelling
+nhanes_covar = nhanes_covar |>
+  mutate(
+    sex = factor(
+      sex,
+      levels = c(1, 2),
+      labels = c("Male", "Female")
+    ),
+    education = factor(
+      education,
+      levels = c(1, 2, 3),
+      labels = c("<high school", "=high school", ">high school")
+    )
+  )
+glimpse(nhanes_covar)
+
+# Merging
+nhanes = nhanes_covar |>
+  inner_join(nhanes_accel, by = "SEQN")
+dim(nhanes)
+```
+
+```{r}
+# Table of Sex and Education Level
+nhanes_covartable = nhanes |>
+  count(education, sex)
+
+nhanes_covartable = nhanes_covartable |>
+  pivot_wider(
+    names_from = sex,
+    values_from = n
+  )
+
+knitr::kable(
+  nhanes_covartable,
+  caption = "Number of Participants by Education Level and Sex"
+)
+
+# Age Distribution Visualization
+nhanes |>
+  ggplot(aes(x = education, y = age, fill = sex)) +
+  geom_boxplot() +
+  labs(
+    title = "Age Distribution by Education Level and Sex",
+    x = "Education Level",
+    y = "Age (years)",
+    fill = "Sex"
+  )
+```
+The table shows that the >high school group has the largest number of participants among the three education categories. Within each education level, the numbers of males and females are relatively similar in the <high school group, while females slightly outnumber males in the >high school group. The most noticeable difference is observed in the =high school group, where there are considerably more males (35) than females (23).
+The boxplot shows that participants in the <high school group have median ages around 60 years for both sexes, while in the =high school group, females have a obviously higher median age than males. Participants in the >high school group are generally younger, with median ages in the early 40s for both sexes. From the trend shown by this boxplot, higher education levels seems to be associated with younger ages.
+```{r}
+# Total Activities and Age Plot
+# Convert from wide to long format first so can group by participant and sum their activity across all 1,440 minutes
+nhanes_long = nhanes |>
+  pivot_longer(
+    min1:min1440,
+    names_to = "minute",
+    values_to = "activity"
+  )
+nhanes_activities = nhanes_long |>
+  group_by(SEQN, sex, age, BMI, education) |>
+  summarize(
+    total_activity = sum(activity, na.rm = TRUE),
+    .groups = "drop"
+  )
+dim(nhanes_activities)
+
+nhanes_activities |>
+  ggplot(aes(x = age, y = total_activity, color = sex)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(se = FALSE) +
+  facet_wrap(~ education) +
+  labs(
+    title = "Total Daily Activity by Age, Sex, and Education Level",
+    x = "Age (years)",
+    y = "Total Daily Activity",
+    color = "Sex"
+  )
+```
+In the <high school group, males and females show relatively similar activity patterns, with total activity decreasing as age increases. In the =high school group, females generally have higher total activity than males at younger ages, but this difference gradually becomes smaller with age. Within this group, total activity initially increases with age, reaches a peak, and then continues to decline. The >high school group shows a similar pattern: females generally have higher total activity at younger ages, but the gap gradually narrows as age increases.
+Interestingly, all three groups show a similar "rebound" pattern, where total activity decreases until a certain age, suddenly increases to form a small peak, and then declines again. The reason behind this pattern might be worth further investigation.
+Overall, total daily activity tends to decrease with age across all three education levels, although the trends are not entirely linear.
+```{r}
+# 24-hour Avtivities Plot
+nhanes_long = nhanes_long |>
+  mutate(
+    minute = as.numeric(str_remove(minute, "min"))
+  )
+nhanes_time = nhanes_long |>
+  group_by(education, sex, minute) |>
+  summarize(
+    mean_activity = mean(activity, na.rm = TRUE),
+    .groups = "drop"
+  )
+nhanes_time |>
+  ggplot(aes(x = minute, y = mean_activity, color = sex)) +
+  geom_line() +
+  facet_wrap(~ education) +
+  scale_x_continuous(
+    breaks = seq(0, 1440, by = 180),
+    labels = paste0(seq(0, 24, by = 3), ":00")
+  ) +
+  labs(
+    title = "24-Hour Activity Patterns",
+    x = "Time",
+    y = "Mean Activity",
+    color = "Sex"
+  )
+```
+All three educational groups shown similar patterns of daily activity. Activity levels were lowest in the early morning, then rose rapidly and remained at a relatively high level during the day; gradually declined in the evening. The differences between male and female varied across the different educational groups. In the <high school group, the activity curves for male and female were relatively similar for most of the time; in the =high school group, female daytime activity levels were slightly higher than male; and in the >high school group, female daytime activity levels were significantly higher than male. There were also differences in activity levels among the different educational groups. The daytime peaks were relatively high in the <high school, while the daytime activity levels were slightly lower in the =high school and >high school group.
