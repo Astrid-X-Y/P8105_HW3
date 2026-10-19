@@ -252,3 +252,209 @@ nhanes_time |>
   )
 ```
 All three educational groups shown similar patterns of daily activity. Activity levels were lowest in the early morning, then rose rapidly and remained at a relatively high level during the day; gradually declined in the evening. The differences between male and female varied across the different educational groups. In the <high school group, the activity curves for male and female were relatively similar for most of the time; in the =high school group, female daytime activity levels were slightly higher than male; and in the >high school group, female daytime activity levels were significantly higher than male. There were also differences in activity levels among the different educational groups. The daytime peaks were relatively high in the <high school, while the daytime activity levels were slightly lower in the =high school and >high school group.
+
+### Q3
+```{r}
+# Loading
+jan2020 = read_csv("Jan 2020 Citi.csv")
+glimpse(jan2020)
+jul2020 = read_csv("July 2020 Citi.csv")
+glimpse(jul2020)
+jan2024 = read_csv("Jan 2024 Citi.csv")
+glimpse(jan2024)
+jul2024 = read_csv("July 2024 Citi.csv")
+glimpse(jul2024)
+
+# Binding and Cleaning
+citibike = bind_rows(jan2020, jul2020, jan2024, jul2024)
+
+citibike = citibike |>
+  mutate(
+    weekdays = factor(
+      weekdays,
+      levels = c(
+        "Monday", "Tuesday", "Wednesday", "Thursday",
+        "Friday", "Saturday", "Sunday"
+      )
+    )
+  )
+levels(citibike$weekdays)
+
+# Add Years and Months
+jan2020 = jan2020 |>
+  mutate(
+    year = 2020,
+    month = "January"
+  )
+
+jul2020 = jul2020 |>
+  mutate(
+    year = 2020,
+    month = "July"
+  )
+
+jan2024 = jan2024 |>
+  mutate(
+    year = 2024,
+    month = "January"
+  )
+
+jul2024 = jul2024 |>
+  mutate(
+    year = 2024,
+    month = "July"
+  )
+
+citibike = bind_rows(jan2020, jul2020, jan2024, jul2024)
+glimpse(citibike)
+
+# Mutation
+citibike = citibike |>
+  mutate(
+    weekdays = factor(
+      weekdays,
+      levels = c(
+        "Monday", "Tuesday", "Wednesday", "Thursday",
+        "Friday", "Saturday", "Sunday"
+      )
+    ),
+    month = factor(month, levels = c("January", "July")),
+    member_casual = factor(member_casual)
+  )
+glimpse(citibike)
+```
+This dataset contains Citi Bike ride data from January and July of 2020 and 2024, with a total of 99,485 observations and 9 variables: ride_id, rideable_type, weekdays, duration, start_station_name, end_station_name, member_casual, year, and month. Since the data were combined from four separate datasets, two variables year and month were added to label when each ride occurred. 43 rides have missing start station information, and 207 rides have missing end station information, but the proportion is very small to be excluded as NAs in later analyses if necessary.
+```{r}
+# Membership Table
+citibike_table = citibike |>
+  count(year, month, member_casual)
+
+knitr::kable(
+  citibike_table,
+  caption = "Number of Citi Bike Rides by Year, Month, and Membership Type"
+)
+# Current table shows all the information needed, but having year, month, and membership all mixed together makes each row a bit complicated to read. It might be clearer to separate membership types into different columns while keeping year and month as separate variables
+citibike_comparison = citibike_table |>
+  pivot_wider(
+    names_from = c(year, member_casual),
+    values_from = n
+  )
+
+knitr::kable(
+  citibike_comparison,
+  caption = "Citi Bike Rides by Month, Year, and Membership Type"
+)
+```
+Overall the number of rides increased substantially from 2020 to 2024 for both casual riders and members. In both years, members accounted for far more rides than casual riders,and both casual and member riders had considerably more rides in July than in January, which suggests that Citi Bike usage is much higher during the summer months. Interestingly the number of member rides in July 2024 (36,262) exceeded the total number of rides by both casual riders and members in July 2020 (21,048).
+```{r}
+# Popular Stations
+citibike_july2024 = citibike |>
+  filter(year == 2024, month == "July")
+
+station_counts = citibike_july2024 |>
+  filter(!is.na(start_station_name)) |>
+  count(start_station_name, sort = TRUE) |>
+  slice_head(n = 5)
+
+station_counts
+
+knitr::kable(
+  station_counts,
+  caption = "5 Most Popular Starting Stations in July 2024"
+)
+```
+
+```{r}
+# My first thought was comparing each variable (week, month, year) to ride duration
+# Weekday to Median Ride Duration
+weekday_median = citibike |>
+  group_by(weekdays) |>
+  summarize(
+    median_duration = median(duration, na.rm = TRUE)
+  )
+weekday_plot = weekday_median |>
+  ggplot(aes(x = weekdays, y = median_duration)) +
+  geom_col() +
+  labs(
+    title = "Median Ride Duration by Weekday",
+    x = "Day of the Week",
+    y = "Median Ride Duration (minutes)"
+  )
+weekday_plot
+
+# Month to Median Ride Duration
+month_median = citibike |>
+  group_by(month) |>
+  summarize(
+    median_duration = median(duration, na.rm = TRUE)
+  )
+month_plot = month_median |>
+  ggplot(aes(x = month, y = median_duration)) +
+  geom_col() +
+  labs(
+    title = "Median Ride Duration by Month",
+    x = "Month",
+    y = "Median Ride Duration (minutes)"
+  )
+month_plot
+
+# Year to Median Ride Duration
+year_median = citibike |>
+  group_by(year) |>
+  summarize(
+    median_duration = median(duration, na.rm = TRUE)
+  )
+year_plot = year_median |>
+  ggplot(aes(x = factor(year), y = median_duration)) +
+  geom_col() +
+  labs(
+    title = "Median Ride Duration by Year",
+    x = "Year",
+    y = "Median Ride Duration (minutes)"
+  )
+year_plot
+
+weekday_plot / (month_plot | year_plot)
+```
+The three plots show some differences in median ride duration across weekdays, months, and years. For weekdays, median ride duration is relatively similar from Monday to Friday, while rides tend to last longer on weekends. For months, median ride duration is noticeably higher in July than in January. And surprisingly the median ride duration is higher in 2020 than in 2024, even though the number of rides increased substantially over this period.
+```{r}
+# These three plots compare each variable with median ride duration separately, without considering how weekday, month, and year interact. It would be better to create another plot that covers all three variables together
+citibike_median = citibike |>
+  group_by(year, month, weekdays) |>
+  summarize(
+    median_duration = median(duration, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+citibike_median |>
+  ggplot(aes(x = weekdays, y = median_duration,
+             color = month, group = month)) +
+  geom_point() +
+  geom_line() +
+  facet_wrap(~ year) +
+  labs(
+    title = "Median Ride Duration by Weekday, Month, and Year",
+    x = "Day of the Week",
+    y = "Median Ride Duration (minutes)",
+    color = "Month"
+  )
+```
+The most noticeable difference is between months. In both 2020 and 2024, median ride duration in July was much higher than in January. Comparing the two years, median ride duration in January changed very little, showing only a slight decrease from 2020 to 2024. But July showed a substantial decrease in median ride duration over the same period. Despite this decline, the overall weekday pattern remained similar, with longer rides on weekends than on weekdays.
+(P.S. I got a little bit confused about what the difference really is between this plot and the three separate plots above. They seem to lead to pretty much the same conclusions to me?)
+```{r}
+# 2024 Distribution
+citibike_2024 = citibike |>
+  filter(year == 2024)
+
+citibike_2024 |>
+  ggplot(aes(x = member_casual, y = duration, fill = rideable_type)) +
+  geom_violin() +
+  facet_wrap(~ month) +
+  labs(
+    title = "Ride Duration Distribution in 2024",
+    x = "Membership Type",
+    y = "Ride Duration (minutes)",
+    fill = "Bike Type"
+  )
+```
+Most rides in both January and July 2024 were relatively short, while only a small number of rides lasted a very long time, shown by the extreme long-tail on the plot. Casual riders generally had longer rides than members, especially when using classic bikes. Comparing bike types, classic bikes tended to have longer rides than electric bikes among casual riders, while the difference was less obvious among members.
